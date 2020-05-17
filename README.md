@@ -1,2 +1,2 @@
-# Rt-India-model
-Current model being used for calculating Rt in Rt-INDIA
+# Rt-India
+Feel free to drop suggestions to improve the model.
