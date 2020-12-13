@@ -23,7 +23,7 @@ df = pd.read_csv(url, index_col=["Date"], parse_dates=["Date"])
 # dropping "Deceased" and "Recovered" rows as that data is not required to calculate Rt
 df = df[df["Status"]=="Confirmed"]
 # Dropping status column as it is no longer required.
-df = df.drop(["Status"], axis=1)
+df = df.drop(["Status", "Date_YMD"], axis=1)
 #Rename "TT" to "IN"
 df = df.rename(columns={"TT": "IN"})
 
@@ -67,19 +67,22 @@ def get_posteriors(sr, sigma=0.15):
     return posteriors, log_likelihood
 
 def highest_density_interval(pmf, p=.9):
-    # If a DataFrame is passed, just call this recursively on the columns
-    if(isinstance(pmf, pd.DataFrame)):
-        return pd.DataFrame([highest_density_interval(pmf[col], p=p) for col in pmf], index=pmf.columns)
-    cumsum = np.cumsum(pmf.values)
-    # N x N matrix of total probability mass for each low, high
-    total_p = cumsum - cumsum[:, None]
-    # Return all indices with total_p > p
-    lows, highs = (total_p > p).nonzero()
-    # Find the smallest range (highest density)
-    best = (highs - lows).argmin()
-    low = pmf.index[lows[best]]
-    high = pmf.index[highs[best]]
-    return pd.Series([low, high], index=[f'Low_{p*100:.0f}', f'High_{p*100:.0f}'])
+    try:
+        # If a DataFrame is passed, just call this recursively on the columns
+        if(isinstance(pmf, pd.DataFrame)):
+            return pd.DataFrame([highest_density_interval(pmf[col], p=p) for col in pmf], index=pmf.columns)
+        cumsum = np.cumsum(pmf.values)
+        # N x N matrix of total probability mass for each low, high
+        total_p = cumsum - cumsum[:, None]
+        # Return all indices with total_p > p
+        lows, highs = (total_p > p).nonzero()
+        # Find the smallest range (highest density)
+        best = (highs - lows).argmin()
+        low = pmf.index[lows[best]]
+        high = pmf.index[highs[best]]
+        return pd.Series([low, high], index=[f'Low_{p*100:.0f}', f'High_{p*100:.0f}'])
+    except:
+        return pd.Series([0.0,0.0], index=['Low_90', 'High_90'])
 
 
 sigmas = np.linspace(1/20, 1, 20)
@@ -100,10 +103,10 @@ for state_name in states:
     elif sum(cases)<100:
         print("Cases < 100 for " + state_name + " - too low!!!")
         continue
-    #Taking mean of first 10 non-zeroes values from daily cases
-    cases_cutoff = cases.to_numpy()[cases.to_numpy()!=0][:10].mean()
+    #Taking mean of first 25 non-zeroes values from daily cases
+    cases_cutoff = cases.to_numpy()[cases.to_numpy()!=0][:25].mean()
     if cases_cutoff >= 1:
-        print("Cutoff (Mean of first 10 non-zero case): " + str(cases_cutoff))
+        print("Cutoff (Mean of first 25 non-zero case): " + str(cases_cutoff))
         new, smoothed = prepare_cases(cases, cutoff=cases_cutoff)
     else:
         new, smoothed = prepare_cases(cases, cutoff=1)
